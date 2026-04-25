@@ -1,0 +1,283 @@
+# ComfyUI Local Deployment Skill
+
+## Skill Metadata
+- **Name**: comfyui-setup
+- **Version**: 1.0.0
+- **Trigger**: User wants to install, deploy, or set up ComfyUI locally on Windows
+- **Author**: guaigaui1
+- **Language**: Chinese (respond in Chinese unless user specifies otherwise)
+
+---
+
+## Trigger Conditions
+
+Activate this skill when the user says any of the following (or similar):
+- "我想安装 ComfyUI"
+- "帮我部署 ComfyUI"
+- "ComfyUI 怎么安装"
+- "我想在本地跑 AI 出图"
+- "install ComfyUI locally"
+
+---
+
+## Pre-flight Checklist
+
+Before starting, ALWAYS ask the user for the following if not already known:
+
+1. **GPU model** — determines VRAM and which launch flags to use
+2. **Existing Python versions** — determines whether to use `py -3.10` launcher or direct `python`
+3. **Target install drive** — default is `D:\ComfyUI`, confirm with user
+
+Map GPU VRAM to launch flags:
+
+| VRAM | Launch Flag | Supported Models |
+|------|-------------|-----------------|
+| 4GB | `--lowvram` | SD 1.5 only |
+| 6GB | `--lowvram` | SD 1.5, SDXL (slow) |
+| 8GB | none | SD 1.5, SDXL |
+| 12GB+ | none | SD 1.5, SDXL, Flux |
+
+---
+
+## Execution Steps
+
+Execute steps in strict order. Wait for user confirmation after each step before proceeding.
+
+### Step 1 — Install Python 3.10
+
+```
+INSTRUCTION TO AI:
+- Tell user to download from: https://www.python.org/downloads/release/python-31011/
+- Specify: Windows installer (64-bit)
+- If user has other Python versions installed: warn NOT to check "Add Python to PATH"
+- If no other Python versions: tell user to check "Add Python to PATH"
+- Verify with: py -3.10 --version
+```
+
+**Verification command:**
+```bash
+py -3.10 --version
+```
+Expected output: `Python 3.10.x`
+
+**Common errors:**
+- `'py' is not recognized` → Python Launcher not installed, reinstall Python 3.10
+- Wrong version shown → System PATH pointing to wrong Python, do not add to PATH
+
+---
+
+### Step 2 — Install Git
+
+```
+INSTRUCTION TO AI:
+- Tell user to download from: https://git-scm.com/download/win
+- All default options during install, no changes needed
+- Verify with: git --version
+```
+
+**Verification command:**
+```bash
+git --version
+```
+
+---
+
+### Step 3 — Clone ComfyUI
+
+```
+INSTRUCTION TO AI:
+- Default install path: D:\ComfyUI
+- If D:\ComfyUI already exists and is not empty:
+    Option A: Ask user to delete it and re-clone
+    Option B: Clone to D:\ComfyUI2 instead
+- Remind user D drive is preferred to avoid C drive space issues
+```
+
+**Command:**
+```bash
+git clone https://github.com/comfyanonymous/ComfyUI.git D:\ComfyUI
+```
+
+**Common errors:**
+- `destination path already exists` → Directory not empty, see options above
+- `SSL certificate problem` → Network issue, ask user to check proxy or VPN
+
+---
+
+### Step 4 — Create Virtual Environment
+
+```
+INSTRUCTION TO AI:
+- ALWAYS use venv to isolate ComfyUI from other Python projects
+- Use py -3.10 launcher to ensure correct Python version
+- Remind user: activate venv EVERY TIME before running any pip or python command
+```
+
+**Commands:**
+```bash
+py -3.10 -m venv D:\ComfyUI\venv
+D:\ComfyUI\venv\Scripts\activate
+```
+
+Expected prompt after activation: `(venv) D:\ComfyUI>`
+
+**Common errors:**
+- `(venv)` not showing → venv not activated, run activate command again
+- pip installing to wrong Python → venv not activated
+
+---
+
+### Step 5 — Install PyTorch (CUDA)
+
+```
+INSTRUCTION TO AI:
+- Always install CUDA version, NOT CPU version
+- Use cu121 for most modern NVIDIA GPUs
+- Warn user: download is ~2.4GB, will take time
+- After install, ALWAYS verify GPU is accessible
+- If user says PyTorch is already installed in another environment:
+    Explain venv isolation — must reinstall inside this venv
+    Check pip cache first to avoid re-downloading
+```
+
+**Check cache first:**
+```bash
+pip cache list | findstr torch
+```
+
+**Install command:**
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+
+**Verification command:**
+```bash
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+Expected output: `True`
+
+If output is `False`:
+- Check NVIDIA driver is up to date
+- Confirm GPU is NVIDIA (not AMD or Intel)
+- Try restarting command prompt and re-activating venv
+
+---
+
+### Step 6 — Install ComfyUI Dependencies
+
+```
+INSTRUCTION TO AI:
+- Must be inside D:\ComfyUI directory
+- Must have venv activated
+- If requirements.txt not found: ComfyUI was not cloned correctly, redo Step 3
+```
+
+**Commands:**
+```bash
+cd D:\ComfyUI
+pip install -r requirements.txt
+```
+
+---
+
+### Step 7 — Download a Model
+
+```
+INSTRUCTION TO AI:
+- ComfyUI cannot generate images without a checkpoint model
+- Recommend these download sources (in order of preference for Chinese users):
+    1. LibLib AI: https://www.liblib.art (faster in China)
+    2. Civitai: https://civitai.com
+- For 6GB VRAM: recommend DreamShaper v7 or v8 (SD 1.5 base, ~2GB)
+- For 8GB+ VRAM: can also recommend SDXL models
+- NEVER recommend Flux models for under 8GB VRAM
+- File format must be .safetensors
+- Target directory: D:\ComfyUI\models\checkpoints\
+```
+
+**Recommended first model:**
+- Name: DreamShaper v7
+- Size: ~2GB
+- Format: `.safetensors`
+- Place at: `D:\ComfyUI\models\checkpoints\DreamShaper_v7.safetensors`
+
+---
+
+### Step 8 — Launch ComfyUI
+
+```
+INSTRUCTION TO AI:
+- Always include --lowvram flag for 6GB or less VRAM
+- Tell user to access via browser, not desktop app
+- If user wants one-click launch: offer to generate a .bat file
+```
+
+**Launch commands:**
+```bash
+D:\ComfyUI\venv\Scripts\activate
+cd D:\ComfyUI
+python main.py --lowvram
+```
+
+Expected output:
+```
+Starting server
+To see the GUI go to: http://127.0.0.1:8188
+```
+
+Browser URL: `http://127.0.0.1:8188`
+
+**One-click launch script (start.bat):**
+```bat
+@echo off
+call D:\ComfyUI\venv\Scripts\activate
+cd /d D:\ComfyUI
+python main.py --lowvram
+pause
+```
+
+---
+
+## Error Handling Rules
+
+```
+INSTRUCTION TO AI:
+- When user pastes an error message, identify the error type first
+- Never ask user to re-do the entire setup for a single error
+- Always isolate which step failed and fix only that step
+- Common error → fix mapping below:
+```
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `No such file or directory: requirements.txt` | Wrong directory or clone failed | `cd D:\ComfyUI` then check files exist |
+| `CUDA out of memory` | Missing `--lowvram` flag | Add `--lowvram` to launch command |
+| `No module named torch` | venv not activated | Run activate command first |
+| `cuda.is_available() = False` | Driver issue or wrong PyTorch | Update NVIDIA driver |
+| `git not recognized` | Git not installed | Redo Step 2 |
+| `py -3.10 not found` | Python 3.10 not installed | Redo Step 1 |
+
+---
+
+## Post-Setup Checklist
+
+After successful launch, confirm with user:
+
+- [ ] Browser opens `http://127.0.0.1:8188` successfully
+- [ ] Model appears in the checkpoint dropdown in ComfyUI
+- [ ] User can queue a prompt and generate an image
+- [ ] Offer to create `start.bat` for one-click launch
+- [ ] Offer to explain the ComfyUI node interface
+
+---
+
+## Next Steps to Suggest
+
+After setup is complete, suggest these next topics:
+
+1. ComfyUI 界面基础操作 — 认识节点、连线、Queue Prompt
+2. 提示词写法入门 — 正向提示词和负向提示词
+3. 安装 ComfyUI Manager — 一键安装插件
+4. ControlNet 入门 — 控制出图姿势和构图
+5. 训练自己的 LoRA 模型
